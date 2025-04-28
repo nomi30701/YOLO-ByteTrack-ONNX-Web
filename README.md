@@ -99,7 +99,14 @@ Update the `src/utils/yolo_classes.json` file with the class names that your cus
 For example:
 
 ```json
-{  "class": {    "0": "person",    "1": "bicycle",    "2": "car",    "3": "motorcycle",    "4": "airplane",    "5": "bus",    "6": "train",    "7": "truck",    "8": "boat"}}
+{"class": 
+  {"0": "person", 
+   "1": "bicycle",
+   "2": "car",
+   "3": "motorcycle",
+   "4": "airplane"
+  }
+}
 ```
 
 Make sure the classes match exactly with those used during training of your custom model.
