@@ -2,7 +2,11 @@
 
 ## ✨ Features
 
-This web application leverages ONNX Runtime Web and YOLO models for multi-object detection and tracking. It supports both YOLO11 and YOLO12 models, with the ByteTrack algorithm for object tracking. Users can upload videos or use their webcam for real-time tracking, all accelerated by WebGPU or WASM on CPU.
+This web application leverages ONNX Runtime Web and YOLO models for multi-object detection and tracking.
+
+It supports both YOLO11 and YOLO12 models, with the ByteTrack algorithm for object tracking.
+
+Users can upload videos or use their webcam for real-time tracking, all accelerated by WebGPU or WASM on CPU.
 
 - 🔍 **Object Detection** - Accurately detect and locate multiple objects using YOLO11 and YOLO12 models
 - 👀 **Object Tracking** - Track detected objects across frames with the ByteTrack algorithm
