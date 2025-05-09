@@ -46,7 +46,7 @@ git clone https://github.com/nomi30701/YOLO-ByteTrack-ONNX-Web.git
 cd YOLO-ByteTrack-ONNX-Web
 ```
 
-Install dependencies
+3. Install dependencies
 ```bash
 yarn install
 ```
