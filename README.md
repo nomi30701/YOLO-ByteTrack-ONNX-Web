@@ -1,5 +1,11 @@
 # YOLO Multi-Object Tracking Web App
 
+<div align="center">
+<img src="https://github.com/nomi30701/YOLO-ByteTrack-ONNX-Web/blob/main/preview.png" width="80%" alt="YOLO Multi-Task Preview">
+<br><br>
+<img src="https://github.com/nomi30701/YOLO-ByteTrack-ONNX-Web/blob/main/preview.gif" width="80%" alt="YOLO Multi-Task Demo">
+</div>
+
 ## ✨ Features
 
 This web application leverages ONNX Runtime Web and YOLO models for multi-object detection and tracking.
@@ -10,7 +16,7 @@ Users can upload videos or use their webcam for real-time tracking, all accelera
 
 - 🔍 **Object Detection** - Accurately detect and locate multiple objects using YOLO11 and YOLO12 models
 - 👀 **Object Tracking** - Track detected objects across frames with the ByteTrack algorithm
-- 📹 **Video Processing** - Upload videos to process and track objects
+- 📹 **Video Processing** - Upload mp4 videos to process and track objects
 - 🖥️ **Real-Time Tracking** - Use webcam for live object tracking
 - ⚙️ **Custom Model Support** - Use custom YOLO models by updating class definitions
 
@@ -31,12 +37,16 @@ Users can upload videos or use their webcam for real-time tracking, all accelera
 ## 🛠️ Installation Guide
 
 ```bash
-# Clone this repository
-git clone https://github.com/your-github-username/yolo-multi-object-tracking-web-app.git
+# 1. Clone this repository
+git clone https://github.com/nomi30701/YOLO-ByteTrack-ONNX-Web.git
+```
 
-# Navigate to the project directory
-cd yolo-multi-object-tracking-web-app
+```bash
+# 2. cd to the project directory
+cd YOLO-ByteTrack-ONNX-Web
+```
 
+```bash
 # Install dependencies
 yarn install
 ```
@@ -46,7 +56,9 @@ yarn install
 ```bash
 # Start development server
 yarn dev
+```
 
+```bash
 # Build the project
 yarn build
 ```
@@ -120,16 +132,16 @@ Make sure the classes match exactly with those used during training of your cust
 > ```Javascript
 > const [src_mat_preProcessed, xRatio, yRatio] = await preProcess(
 >   src_mat,
->   sessionsConfig.input_shape[2],
->   sessionsConfig.input_shape[3]
+>   640,
+>   640
 > );
 > ```
 > 
 > 2. Remove the dynamic sizing code:
 > ```Javascript
 > const [src_mat_preProcessed, div_width, div_height] = preProcess_dynamic(src_mat);
-> const xRatio = src_mat.cols / div_width;
-> const yRatio = src_mat.rows / div_height;
+> const xRatio = overlay_el.width / div_width;
+> const yRatio = overlay_el.height / div_height;
 > ```
 >
 > 3. Change Tensor size
@@ -137,8 +149,8 @@ Make sure the classes match exactly with those used during training of your cust
 > const input_tensor = new ort.Tensor("float32", src_mat_preProcessed.data32F, [
 >   1,
 >   3,
->   config.input_shape[2],
->   config.input_shape[3],
+>   640,
+>   640,
 > ]);
 >
 

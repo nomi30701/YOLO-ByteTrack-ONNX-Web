@@ -1,34 +1,38 @@
 import * as ort from "onnxruntime-web/webgpu";
-import { BYTETracker } from "./tracker";
 import { preProcess_dynamic, preProcess, applyNMS } from "./img_preprocess";
 
-const tracker = new BYTETracker();
-
-export const inference_pipeline = async (input_el, session) => {
-  let input_tensor = null;
-  let output0 = null;
-
+/**
+ * Inference pipeline for YOLO model.
+ * @param {cv.Mat} src_mat - Input image Mat.
+ * @param {[Number, Number]} overlay_size - Overlay width and height. [width, height]
+ * @param {ort.InferenceSession} session - YOLO model session.
+ * @param {BYTETracke} tracker - Object tracker instance.
+ * @returns {[Array[Object], Number]} - Array of predictions and inference time.
+ */
+export async function inference_pipeline(
+  src_mat,
+  overlay_size,
+  session,
+  tracker
+) {
   try {
-    const src_mat = cv.imread(input_el);
-
     // const [src_mat_preProcessed, xRatio, yRatio] = await preProcess(
     //   src_mat,
-    //   sessionsConfig.input_shape[2],
-    //   sessionsConfig.input_shape[3]
+    //   640,
+    //   640
     // );
 
     const [src_mat_preProcessed, div_width, div_height] =
       preProcess_dynamic(src_mat);
-    const xRatio = src_mat.cols / div_width;
-    const yRatio = src_mat.rows / div_height;
+    const xRatio = overlay_size[0] / div_width; // scale factor for overlay
+    const yRatio = overlay_size[1] / div_height;
     src_mat.delete();
 
-    input_tensor = new ort.Tensor("float32", src_mat_preProcessed.data32F, [
-      1,
-      3,
-      div_height,
-      div_width,
-    ]);
+    const input_tensor = new ort.Tensor(
+      "float32",
+      src_mat_preProcessed.data32F,
+      [1, 3, div_height, div_width]
+    );
     src_mat_preProcessed.delete();
 
     const start = performance.now();
@@ -39,7 +43,7 @@ export const inference_pipeline = async (input_el, session) => {
 
     input_tensor.dispose();
 
-    // post process
+    // Post process
     const NUM_PREDICTIONS = output0.dims[2];
     const NUM_BBOX_ATTRS = 4;
     const NUM_SCORES = 80;
@@ -63,7 +67,7 @@ export const inference_pipeline = async (input_el, session) => {
           cls_idx = c;
         }
       }
-      // filter low confidence for ByteTrack
+      // Filter low confidence for ByteTrack
       if (maxScore <= 0.2) continue;
 
       // x_center, y_center, width, height
@@ -91,10 +95,7 @@ export const inference_pipeline = async (input_el, session) => {
 
     return [tracked_objects, (end - start).toFixed(2)];
   } catch (error) {
-    console.error("Inference error:", error);
+    console.error("Inference error:", error.name, error.message, error.stack);
     return [[], "0.00"];
-  } finally {
-    if (input_tensor) input_tensor.dispose();
-    if (output0) output0.dispose();
   }
-};
+}

@@ -2,7 +2,7 @@ import * as math from "mathjs";
 import { minWeightAssign } from "munkres-algorithm";
 
 const BYTE_TRACKER_CONFIG = {
-  track_high_thresh: 0.35, // threshold for the first association (0.25 are default)
+  track_high_thresh: 0.25, // threshold for the first association (0.25 are default)
   track_low_thresh: 0.1, // threshold for the second association
   new_track_thresh: 0.25, // threshold for init new track if the detection does not match any tracks
   track_buffer: 30, // buffer to calculate the time when to remove tracks

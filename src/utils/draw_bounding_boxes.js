@@ -7,27 +7,16 @@ import { Colors } from "./img_preprocess.js";
  * @param {HTMLCanvasElement} overlay_el - Show boxes in overlay canvas element
  */
 export async function draw_bounding_boxes(predictions, overlay_el) {
+  if (!predictions) return;
+
   const ctx = overlay_el.getContext("2d");
+  const predictionsByClass = {};
 
   // Calculate diagonal length of the canvas
   const diagonalLength = Math.sqrt(
     Math.pow(overlay_el.width, 2) + Math.pow(overlay_el.height, 2)
   );
   const lineWidth = diagonalLength / 250;
-
-  if (!predictions || predictions.length === 0) return;
-
-
-  draw_object_detection(ctx, predictions, lineWidth);
-
-}
-
-/**
- * Draw object detection results
- */
-function draw_object_detection(ctx, predictions, lineWidth) {
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  const predictionsByClass = {};
 
   predictions.forEach((predict) => {
     const classId = predict.cls_idx;
@@ -60,9 +49,9 @@ function draw_object_detection(ctx, predictions, lineWidth) {
     ctx.font = "16px Arial";
     items.forEach((predict) => {
       const [x1, y1] = predict.tlwh;
-      const text = `${predict.track_id} ${classes.class[predict.cls_idx]} ${predict.score.toFixed(
-        2
-      )}`;
+      const text = `${predict.track_id} ${
+        classes.class[predict.cls_idx]
+      } ${predict.score.toFixed(2)}`;
       drawTextWithBackground(ctx, text, x1, y1);
     });
   });

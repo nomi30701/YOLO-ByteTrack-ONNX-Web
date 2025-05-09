@@ -1,16 +1,13 @@
 import "./assets/App.css";
-import classes from "./utils/yolo_classes.json";
+import cv from "@techstark/opencv-js";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { model_loader } from "./utils/model_loader";
 import { inference_pipeline } from "./utils/inference_pipeline";
 import { draw_bounding_boxes } from "./utils/draw_bounding_boxes";
+import { BYTETracker } from "./utils/tracker";
+import classes from "./utils/yolo_classes.json";
 
-// TODO: change open "image" to open "video", process video for object tracking
-
-const DEFAULT_CONFIG = {
-  input_shape: [1, 3, 640, 640],
-  backend: "webgpu",
-};
+// TODO: add set class.json
 
 // set Components
 function SettingsPanel({
@@ -18,10 +15,9 @@ function SettingsPanel({
   modelRef,
   cameraSelectorRef,
   cameras,
-  camera_stream,
   customModels,
   onModelChange,
-  isModelLoaded,
+  activeFeature,
 }) {
   return (
     <div
@@ -37,7 +33,7 @@ function SettingsPanel({
           name="device-selector"
           ref={backendRef}
           onChange={onModelChange}
-          disabled={camera_stream || !isModelLoaded}
+          disabled={activeFeature !== null}
           className="ml-2"
         >
           <option value="wasm">Wasm(cpu)</option>
@@ -53,7 +49,7 @@ function SettingsPanel({
           name="model-selector"
           ref={modelRef}
           onChange={onModelChange}
-          disabled={camera_stream || !isModelLoaded}
+          disabled={activeFeature !== null}
           className="ml-2"
         >
           <option value="yolo12n">yolo12n-2.6M</option>
@@ -75,8 +71,8 @@ function SettingsPanel({
         <label htmlFor="camera-selector">Camera:</label>
         <select
           ref={cameraSelectorRef}
+          disabled={activeFeature !== null}
           className="ml-2"
-          disabled={camera_stream}
         >
           {cameras.map((camera, index) => (
             <option key={index} value={camera.deviceId}>
@@ -91,24 +87,21 @@ function SettingsPanel({
 
 // Display Components
 function ImageDisplay({
-  inputCanvasRef,
   cameraRef,
   imgRef,
   overlayRef,
   imgSrc,
-  camera_stream,
   onCameraLoad,
   onImageLoad,
-  isProcessing,
+  activeFeature,
 }) {
   return (
     <div className="container bg-stone-700 shadow-lg relative min-h-[320px] flex justify-center items-center">
-      <canvas ref={inputCanvasRef} hidden></canvas>
       <video
-        className="block w-full max-w-full md:max-w-[720px] max-h-[640px] rounded-lg inset-0 mx-auto"
+        className="block md:max-w-[720px] max-h-[640px] rounded-lg mx-auto"
         ref={cameraRef}
-        onLoadedData={onCameraLoad}
-        hidden={!camera_stream}
+        onLoadedMetadata={onCameraLoad}
+        hidden={activeFeature !== "camera"}
         autoPlay
       />
       <img
@@ -116,42 +109,39 @@ function ImageDisplay({
         ref={imgRef}
         src={imgSrc}
         onLoad={onImageLoad}
-        hidden={camera_stream}
+        hidden={activeFeature !== "image"}
         className="block md:max-w-[720px] max-h-[640px] rounded-lg"
       />
-      <canvas ref={overlayRef} className="absolute"></canvas>
-      {isProcessing && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white">
-          <div className="animate-pulse text-xl">Processing...</div>
-        </div>
-      )}
+      <canvas
+        ref={overlayRef}
+        hidden={activeFeature === null}
+        className="absolute"
+      ></canvas>
     </div>
   );
 }
 
 // button Components
 function ControlButtons({
-  camera_stream,
-  cameras,
   imgSrc,
-  isModelLoaded,
-  openImageRef,
-  onOpenImageClick,
-  onToggleCamera,
-  onAddModel,
+  fileVideoRef,
+  fileImageRef,
+  handle_OpenVideo,
+  handle_OpenImage,
+  handle_ToggleCamera,
+  handle_AddModel,
+  activeFeature,
 }) {
   return (
     <div id="btn-container" className="container flex justify-around gap-x-4">
       <input
         type="file"
-        accept="image/*"
+        accept="video/mp4"
         hidden
-        ref={openImageRef}
+        ref={fileVideoRef}
         onChange={(e) => {
           if (e.target.files[0]) {
-            const file = e.target.files[0];
-            const imgUrl = URL.createObjectURL(file);
-            onOpenImageClick(imgUrl);
+            handle_OpenVideo(e.target.files[0]);
             e.target.value = null;
           }
         }}
@@ -159,24 +149,47 @@ function ControlButtons({
 
       <button
         className="btn"
-        disabled={camera_stream || !isModelLoaded}
-        onClick={() =>
-          imgSrc ? onOpenImageClick() : openImageRef.current.click()
-        }
+        onClick={() => fileVideoRef.current.click()}
+        disabled={activeFeature !== null}
       >
-        {imgSrc ? "Close Image" : "Open Image"}
+        Open video
+      </button>
+
+      <input
+        type="file"
+        accept="image/*"
+        hidden
+        ref={fileImageRef}
+        onChange={(e) => {
+          if (e.target.files[0]) {
+            const file = e.target.files[0];
+            const imgUrl = URL.createObjectURL(file);
+            handle_OpenImage(imgUrl);
+            e.target.value = null;
+          }
+        }}
+      />
+
+      <button
+        className="btn"
+        onClick={() =>
+          imgSrc ? handle_OpenImage() : fileImageRef.current.click()
+        }
+        disabled={activeFeature !== null && activeFeature !== "image"}
+      >
+        {activeFeature === "image" ? "Close Image" : "Open Image"}
       </button>
 
       <button
         className="btn"
-        onClick={onToggleCamera}
-        disabled={cameras.length === 0 || imgSrc || !isModelLoaded}
+        onClick={handle_ToggleCamera}
+        disabled={activeFeature !== null && activeFeature !== "camera"}
       >
-        {camera_stream ? "Close Camera" : "Open Camera"}
+        {activeFeature === "camera" ? "Close Camera" : "Open Camera"}
       </button>
 
       <label className="btn cursor-pointer">
-        <input type="file" accept=".onnx" onChange={onAddModel} hidden />
+        <input type="file" accept=".onnx" onChange={handle_AddModel} hidden />
         <span>Add model</span>
       </label>
     </div>
@@ -210,10 +223,23 @@ function ModelStatus({ warnUpTime, inferenceTime, statusMsg, statusColor }) {
 }
 
 function ResultsTable({ details }) {
+  if (details.length === 0) {
+    return (
+      <details className="text-gray-200 group px-2">
+        <summary className="my-2 hover:text-gray-400 cursor-pointer transition-colors duration-300">
+          Detection Results ( {details.length} )
+        </summary>
+        <div className="transition-all duration-300 ease-in-out transform origin-top group-open:animate-details-show">
+          <p className="text-center text-gray-400 py-2">No object detected</p>
+        </div>
+      </details>
+    );
+  }
+
   return (
     <details className="text-gray-200 group px-2">
       <summary className="my-5 hover:text-gray-400 cursor-pointer transition-colors duration-300">
-        Detected objects
+        Detection Results ( {details.length} )
       </summary>
       <div
         className="transition-all duration-300 ease-in-out transform origin-top
@@ -262,75 +288,64 @@ function ResultsTable({ details }) {
 
 function App() {
   const [modelState, setModelState] = useState({
-    isLoaded: false,
     warnUpTime: 0,
     inferenceTime: 0,
     statusMsg: "Model not loaded",
     statusColor: "inherit",
   });
-  const {
-    isLoaded: isModelLoaded,
-    warnUpTime,
-    inferenceTime,
-    statusMsg,
-    statusColor,
-  } = modelState;
+  const { warnUpTime, inferenceTime, statusMsg, statusColor } = modelState;
 
   // resource reference
-  const modelCache = useRef({});
-  const canvasContextRef = useRef(null);
   const backendRef = useRef(null);
   const modelRef = useRef(null);
   const cameraSelectorRef = useRef(null);
   const sessionRef = useRef(null);
+  const modelConfigRef = useRef(null);
+  const modelCache = useRef({});
 
   // content reference
   const imgRef = useRef(null);
   const overlayRef = useRef(null);
   const cameraRef = useRef(null);
-  const inputCanvasRef = useRef(null);
-  const openImageRef = useRef(null);
+  const fileImageRef = useRef(null);
+  const fileVideoRef = useRef(null);
 
   // state
   const [customModels, setCustomModels] = useState([]);
   const [cameras, setCameras] = useState([]);
-  const [camera_stream, setCameraStream] = useState(null);
   const [imgSrc, setImgSrc] = useState(null);
   const [details, setDetails] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
+  const [activeFeature, setActiveFeature] = useState(null); // null, 'video', 'image', 'camera'
 
-  // init
+  // worker
+  const videoWorkerRef = useRef(null);
+
+  // Init page
   useEffect(() => {
     loadModel();
     getCameras();
 
-    return () => {
-      // cleanup
-      if (camera_stream) {
-        camera_stream.getTracks().forEach((track) => track.stop());
+    videoWorkerRef.current = new Worker(
+      new URL("./utils/video_process_worker.js", import.meta.url),
+      {
+        type: "module",
       }
-
-      // cleanup custom models
-      customModels.forEach((model) => {
-        if (model.url && model.url.startsWith("blob:")) {
-          URL.revokeObjectURL(model.url);
-        }
-      });
-
-      if (imgSrc && imgSrc.startsWith("blob:")) {
-        URL.revokeObjectURL(imgSrc);
+    );
+    videoWorkerRef.current.onmessage = (e) => {
+      setModelState((prev) => ({
+        ...prev,
+        statusMsg: e.data.statusMsg,
+      }));
+      if (e.data.processedVideo) {
+        const url = URL.createObjectURL(e.data.processedVideo);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "processed_video.mp4";
+        a.click();
+        URL.revokeObjectURL(url);
+        setActiveFeature(null);
       }
     };
-  }, []);
-
-  // init canvas context
-  useEffect(() => {
-    if (inputCanvasRef.current) {
-      canvasContextRef.current = inputCanvasRef.current.getContext("2d", {
-        willReadFrequently: true,
-      });
-    }
   }, []);
 
   const loadModel = useCallback(async () => {
@@ -339,16 +354,12 @@ function App() {
       ...prev,
       statusMsg: "Loading model...",
       statusColor: "red",
-      isLoaded: false,
     }));
+    setActiveFeature("loading");
 
     // get model config
     const backend = backendRef.current?.value || "webgpu";
     const selectedModel = modelRef.current?.value || "yolo11n";
-
-    // update config
-    const newConfig = { ...DEFAULT_CONFIG, backend };
-    setConfig(newConfig);
 
     const customModel = customModels.find(
       (model) => model.url === selectedModel
@@ -358,6 +369,8 @@ function App() {
       ? customModel.url
       : `${window.location.href}/models/${selectedModel}.onnx`;
 
+    modelConfigRef.current = { model_path, backend };
+
     const cacheKey = `${selectedModel}-${backend}`;
     if (modelCache.current[cacheKey]) {
       sessionRef.current = modelCache.current[cacheKey];
@@ -365,15 +378,15 @@ function App() {
         ...prev,
         statusMsg: "Model loaded from cache",
         statusColor: "green",
-        isLoaded: true,
       }));
+      setActiveFeature(null);
       return;
     }
 
     try {
       // load model
       const start = performance.now();
-      const yolo_model = await model_loader(model_path, newConfig);
+      const yolo_model = await model_loader(model_path, backend);
       const end = performance.now();
 
       sessionRef.current = yolo_model;
@@ -384,16 +397,16 @@ function App() {
         statusMsg: "Model loaded",
         statusColor: "green",
         warnUpTime: (end - start).toFixed(2),
-        isLoaded: true,
       }));
     } catch (error) {
       setModelState((prev) => ({
         ...prev,
         statusMsg: "Model loading failed",
         statusColor: "red",
-        isLoaded: false,
       }));
       console.error(error);
+    } finally {
+      setActiveFeature(null);
     }
   }, [customModels]);
 
@@ -425,32 +438,32 @@ function App() {
     (imgUrl = null) => {
       if (imgUrl) {
         setImgSrc(imgUrl);
+        setActiveFeature("image");
       } else if (imgSrc) {
         if (imgSrc.startsWith("blob:")) {
           URL.revokeObjectURL(imgSrc);
         }
-        setImgSrc("");
-        if (overlayRef.current) {
-          overlayRef.current.width = 0;
-          overlayRef.current.height = 0;
-        }
+        overlayRef.current.width = 0;
+        overlayRef.current.height = 0;
+        setImgSrc(null);
         setDetails([]);
+        setActiveFeature(null);
       }
     },
     [imgSrc]
   );
 
   const handle_ImageLoad = useCallback(async () => {
-    if (!imgRef.current || !overlayRef.current || !sessionRef.current) return;
-
-    setIsProcessing(true);
     overlayRef.current.width = imgRef.current.width;
     overlayRef.current.height = imgRef.current.height;
 
     try {
+      const src_mat = cv.imread(imgRef.current);
       const [results, results_inferenceTime] = await inference_pipeline(
-        imgRef.current,
-        sessionRef.current
+        src_mat,
+        [overlayRef.current.width, overlayRef.current.height],
+        sessionRef.current,
+        new BYTETracker()
       );
       setDetails(results);
       setModelState((prev) => ({
@@ -460,24 +473,19 @@ function App() {
       draw_bounding_boxes(results, overlayRef.current);
     } catch (error) {
       console.error("Image processing error:", error);
-    } finally {
-      setIsProcessing(false);
     }
-  }, [config, sessionRef.current]);
+  }, [sessionRef.current]);
 
   const handle_ToggleCamera = useCallback(async () => {
-    if (camera_stream) {
+    if (cameraRef.current.srcObject) {
       // stop camera
-      camera_stream.getTracks().forEach((track) => track.stop());
+      cameraRef.current.srcObject.getTracks().forEach((track) => track.stop());
       cameraRef.current.srcObject = null;
-      setCameraStream(null);
-      if (overlayRef.current) {
-        overlayRef.current.width = 0;
-        overlayRef.current.height = 0;
-        overlayRef.current.style.width = `0px`;
-        overlayRef.current.style.height = `0px`;
-      }
+      overlayRef.current.width = 0;
+      overlayRef.current.height = 0;
+
       setDetails([]);
+      setActiveFeature(null);
     } else if (cameraSelectorRef.current && cameraSelectorRef.current.value) {
       try {
         // open camera
@@ -487,89 +495,72 @@ function App() {
           },
           audio: false,
         });
-        setCameraStream(stream);
         cameraRef.current.srcObject = stream;
+        setActiveFeature("camera");
       } catch (err) {
         console.error("Error accessing camera:", err);
       }
     }
-  }, [camera_stream]);
+  }, []);
 
   const handle_cameraLoad = useCallback(() => {
-    if (
-      !cameraRef.current ||
-      !canvasContextRef.current ||
-      !inputCanvasRef.current ||
-      !overlayRef.current
-    )
-      return;
-    const ctx = canvasContextRef.current;
+    overlayRef.current.width = cameraRef.current.clientWidth;
+    overlayRef.current.height = cameraRef.current.clientHeight;
 
-    // set input canvas size same as camera size
-    ctx.canvas.width = cameraRef.current.videoWidth;
-    ctx.canvas.height = cameraRef.current.videoHeight;
+    let inputCanvas = new OffscreenCanvas(
+      cameraRef.current.videoWidth,
+      cameraRef.current.videoHeight
+    );
+    let ctx = inputCanvas.getContext("2d", {
+      willReadFrequently: true,
+    });
 
-    // set overlay size same as camera size
-    overlayRef.current.width = cameraRef.current.videoWidth;
-    overlayRef.current.height = cameraRef.current.videoHeight;
+    const handle_frame_continuous = async () => {
+      if (!cameraRef.current?.srcObject) {
+        inputCanvas = null;
+        ctx = null;
+        return;
+      }
+      ctx.drawImage(
+        cameraRef.current,
+        0,
+        0,
+        cameraRef.current.videoWidth,
+        cameraRef.current.videoHeight
+      ); // draw camera frame to input canvas
+      const src_mat = cv.imread(inputCanvas);
+      const [results, results_inferenceTime] = await inference_pipeline(
+        src_mat,
+        [overlayRef.current.width, overlayRef.current.height],
+        sessionRef.current,
+        new BYTETracker()
+      );
+      draw_bounding_boxes(results, overlayRef.current);
+      setDetails(results);
+      setModelState((prev) => ({
+        ...prev,
+        inferenceTime: results_inferenceTime,
+      }));
 
-    // set css ovelay size same as camera size
-    const videoRect = cameraRef.current.getBoundingClientRect();
-    overlayRef.current.style.width = `${videoRect.width}px`;
-    overlayRef.current.style.height = `${videoRect.height}px`;
-
-    handle_frame_continuous(ctx);
+      requestAnimationFrame(handle_frame_continuous);
+    };
+    requestAnimationFrame(handle_frame_continuous);
   }, [sessionRef.current]);
 
-  const handle_frame_continuous = useCallback(
-    async (ctx) => {
-      if (!cameraRef.current?.srcObject) return;
-
-      // 30fps
-      const now = performance.now();
-      if (!window.lastFrameTime || now - window.lastFrameTime > 33) {
-        window.lastFrameTime = now;
-
-        // Render frame to canvas
-        const videoRect = cameraRef.current.getBoundingClientRect();
-        ctx.drawImage(
-          cameraRef.current,
-          0,
-          0,
-          cameraRef.current.videoWidth,
-          cameraRef.current.videoHeight
-        );
-
-        try {
-          const [results, results_inferenceTime] = await inference_pipeline(
-            inputCanvasRef.current,
-            sessionRef.current
-          );
-
-          // only update state if results change to reduce re-render
-          if (JSON.stringify(results) !== JSON.stringify(details)) {
-            setDetails(results);
-          }
-
-          // only update state if inference time changes to reduce re-render
-          if (results_inferenceTime !== inferenceTime) {
-            setModelState((prev) => ({
-              ...prev,
-              inferenceTime: results_inferenceTime,
-            }));
-          }
-
-          draw_bounding_boxes(results, overlayRef.current);
-        } catch (error) {
-          console.error("Frame processing error:", error);
-        }
-      }
-
-      // next frame
-      requestAnimationFrame(() => handle_frame_continuous(ctx));
-    },
-    [config, sessionRef.current, details, inferenceTime]
-  );
+  const handle_OpenVideo = useCallback((file) => {
+    if (file) {
+      videoWorkerRef.current.postMessage(
+        {
+          file: file,
+          modelConfig: modelConfigRef.current,
+        },
+        []
+      );
+      setActiveFeature("video");
+    } else {
+      setActiveFeature(null);
+    }
+  }, []);
 
   return (
     <>
@@ -582,33 +573,31 @@ function App() {
         modelRef={modelRef}
         cameraSelectorRef={cameraSelectorRef}
         cameras={cameras}
-        camera_stream={camera_stream}
         customModels={customModels}
         onModelChange={loadModel}
-        isModelLoaded={isModelLoaded}
+        activeFeature={activeFeature}
       />
 
       <ImageDisplay
-        inputCanvasRef={inputCanvasRef}
         cameraRef={cameraRef}
         imgRef={imgRef}
         overlayRef={overlayRef}
         imgSrc={imgSrc}
-        camera_stream={camera_stream}
         onCameraLoad={handle_cameraLoad}
         onImageLoad={handle_ImageLoad}
-        isProcessing={isProcessing}
+        activeFeature={activeFeature}
       />
 
       <ControlButtons
-        camera_stream={camera_stream}
         cameras={cameras}
         imgSrc={imgSrc}
-        isModelLoaded={isModelLoaded}
-        openImageRef={openImageRef}
-        onOpenImageClick={handle_OpenImage}
-        onToggleCamera={handle_ToggleCamera}
-        onAddModel={handle_AddModel}
+        fileVideoRef={fileVideoRef}
+        fileImageRef={fileImageRef}
+        handle_OpenVideo={handle_OpenVideo}
+        handle_OpenImage={handle_OpenImage}
+        handle_ToggleCamera={handle_ToggleCamera}
+        handle_AddModel={handle_AddModel}
+        activeFeature={activeFeature}
       />
 
       <ModelStatus

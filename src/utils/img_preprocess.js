@@ -1,3 +1,4 @@
+import cv from '@techstark/opencv-js';
 /**
  * Pre process input image.
  *
