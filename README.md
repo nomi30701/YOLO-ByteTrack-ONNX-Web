@@ -36,30 +36,30 @@ Users can upload videos or use their webcam for real-time tracking, all accelera
 
 ## 🛠️ Installation Guide
 
+1. Clone this repository
 ```bash
-# 1. Clone this repository
 git clone https://github.com/nomi30701/YOLO-ByteTrack-ONNX-Web.git
 ```
 
+2. cd to the project directory
 ```bash
-# 2. cd to the project directory
 cd YOLO-ByteTrack-ONNX-Web
 ```
 
+Install dependencies
 ```bash
-# Install dependencies
 yarn install
 ```
 
 ## 🚀 Running the Project
 
+Start development server
 ```bash
-# Start development server
 yarn dev
 ```
 
+Build the project
 ```bash
-# Build the project
 yarn build
 ```
 
