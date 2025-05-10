@@ -3,18 +3,17 @@ import { Colors } from "./img_preprocess.js";
 
 /**
  * Draw bounding boxes in overlay canvas based on task type.
- * @param {Array[Object]} predictions - Detection/pose results
+ * @param {Array[Object]} predictions - Detection results
  * @param {HTMLCanvasElement} overlay_el - Show boxes in overlay canvas element
  */
-export async function draw_bounding_boxes(predictions, overlay_el) {
+export async function draw_bounding_boxes(predictions, overlayCtx) {
   if (!predictions) return;
 
-  const ctx = overlay_el.getContext("2d");
   const predictionsByClass = {};
 
   // Calculate diagonal length of the canvas
   const diagonalLength = Math.sqrt(
-    Math.pow(overlay_el.width, 2) + Math.pow(overlay_el.height, 2)
+    Math.pow(overlayCtx.canvas.width, 2) + Math.pow(overlayCtx.canvas.height, 2)
   );
   const lineWidth = diagonalLength / 250;
 
@@ -30,29 +29,29 @@ export async function draw_bounding_boxes(predictions, overlay_el) {
     const rgbaFillColor = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3]})`;
     const rgbaBorderColor = `rgba(${borderColor[0]}, ${borderColor[1]}, ${borderColor[2]}, ${borderColor[3]})`;
 
-    ctx.fillStyle = rgbaFillColor;
+    overlayCtx.fillStyle = rgbaFillColor;
     items.forEach((predict) => {
       const [x1, y1, width, height] = predict.tlwh;
-      ctx.fillRect(x1, y1, width, height);
+      overlayCtx.fillRect(x1, y1, width, height);
     });
 
     // draw bounding box
-    ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = rgbaBorderColor;
+    overlayCtx.lineWidth = lineWidth;
+    overlayCtx.strokeStyle = rgbaBorderColor;
     items.forEach((predict) => {
       const [x1, y1, width, height] = predict.tlwh;
-      ctx.strokeRect(x1, y1, width, height);
+      overlayCtx.strokeRect(x1, y1, width, height);
     });
 
     // draw score text
-    ctx.fillStyle = rgbaBorderColor;
-    ctx.font = "16px Arial";
+    overlayCtx.fillStyle = rgbaBorderColor;
+    overlayCtx.font = "16px Arial";
     items.forEach((predict) => {
       const [x1, y1] = predict.tlwh;
       const text = `${predict.track_id} ${
         classes.class[predict.cls_idx]
       } ${predict.score.toFixed(2)}`;
-      drawTextWithBackground(ctx, text, x1, y1);
+      drawTextWithBackground(overlayCtx, text, x1, y1);
     });
   });
 }

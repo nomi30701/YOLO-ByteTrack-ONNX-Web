@@ -130,7 +130,7 @@ self.onmessage = async function (e) {
         yolo_model,
         new BYTETracker()
       );
-      await draw_bounding_boxes(results, resultCanvas);
+      await draw_bounding_boxes(results, resultCtx);
 
       // Create frame from result canvas
       const outputFrame = new VideoFrame(resultCanvas, {

@@ -465,12 +465,20 @@ function App() {
         sessionRef.current,
         new BYTETracker()
       );
+      const overlayCtx = overlayRef.current.getContext("2d");
+      overlayCtx.clearRect(
+        0,
+        0,
+        overlayCtx.canvas.width,
+        overlayCtx.canvas.height
+      );
+
+      draw_bounding_boxes(results, overlayCtx);
       setDetails(results);
       setModelState((prev) => ({
         ...prev,
         inferenceTime: results_inferenceTime,
       }));
-      draw_bounding_boxes(results, overlayRef.current);
     } catch (error) {
       console.error("Image processing error:", error);
     }
@@ -535,7 +543,15 @@ function App() {
         sessionRef.current,
         new BYTETracker()
       );
-      draw_bounding_boxes(results, overlayRef.current);
+      const overlayCtx = overlayRef.current.getContext("2d");
+      overlayCtx.clearRect(
+        0,
+        0,
+        overlayCtx.canvas.width,
+        overlayCtx.canvas.height
+      );
+      draw_bounding_boxes(results, overlayCtx);
+
       setDetails(results);
       setModelState((prev) => ({
         ...prev,
