@@ -8,12 +8,15 @@ import { BYTETracker } from "./utils/tracker";
 import classes from "./utils/yolo_classes.json";
 
 // TODO: add set class.json
+// TODO: button components too much code
+// TODO: README.md add package import
 
 // set Components
 function SettingsPanel({
-  backendRef,
-  modelRef,
+  backendSelectorRef,
+  modelSelectorRef,
   cameraSelectorRef,
+  imgszTypeSelectorRef,
   cameras,
   customModels,
   onModelChange,
@@ -24,14 +27,11 @@ function SettingsPanel({
       id="setting-container"
       className="container text-lg flex flex-col md:flex-row md:justify-evenly gap-2 md:gap-6"
     >
-      <div
-        id="device-selector-container"
-        className="flex items-center justify-between md:justify-start"
-      >
-        <label htmlFor="device-selector">Backend:</label>
+      <div id="selector-container">
+        <label>Backend:</label>
         <select
           name="device-selector"
-          ref={backendRef}
+          ref={backendSelectorRef}
           onChange={onModelChange}
           disabled={activeFeature !== null}
           className="ml-2"
@@ -40,14 +40,11 @@ function SettingsPanel({
           <option value="webgpu">webGPU</option>
         </select>
       </div>
-      <div
-        id="model-selector-container"
-        className="flex items-center justify-between md:justify-start"
-      >
-        <label htmlFor="model-selector">Model:</label>
+      <div id="selector-container">
+        <label>Model:</label>
         <select
           name="model-selector"
-          ref={modelRef}
+          ref={modelSelectorRef}
           onChange={onModelChange}
           disabled={activeFeature !== null}
           className="ml-2"
@@ -64,11 +61,8 @@ function SettingsPanel({
           ))}
         </select>
       </div>
-      <div
-        id="camera-selector-container"
-        className="flex items-center justify-between md:justify-start"
-      >
-        <label htmlFor="camera-selector">Camera:</label>
+      <div id="selector-container">
+        <label>Camera:</label>
         <select
           ref={cameraSelectorRef}
           disabled={activeFeature !== null}
@@ -79,6 +73,17 @@ function SettingsPanel({
               {camera.label || `Camera ${index + 1}`}
             </option>
           ))}
+        </select>
+      </div>
+      <div id="selector-container">
+        <label>Imgsz_type:</label>
+        <select
+          disabled={activeFeature !== null}
+          ref={imgszTypeSelectorRef}
+          className="ml-2"
+        >
+          <option value="dynamic">Dynamic</option>
+          <option value="zeroPad">Zero Pad</option>
         </select>
       </div>
     </div>
@@ -188,7 +193,7 @@ function ControlButtons({
         {activeFeature === "camera" ? "Close Camera" : "Open Camera"}
       </button>
 
-      <label className="btn cursor-pointer">
+      <label className="btn">
         <input type="file" accept=".onnx" onChange={handle_AddModel} hidden />
         <span>Add model</span>
       </label>
@@ -296,9 +301,10 @@ function App() {
   const { warnUpTime, inferenceTime, statusMsg, statusColor } = modelState;
 
   // resource reference
-  const backendRef = useRef(null);
-  const modelRef = useRef(null);
+  const backendSelectorRef = useRef(null);
+  const modelSelectorRef = useRef(null);
   const cameraSelectorRef = useRef(null);
+  const imgszTypeSelectorRef = useRef(null);
   const sessionRef = useRef(null);
   const modelConfigRef = useRef(null);
   const modelCache = useRef({});
@@ -358,8 +364,8 @@ function App() {
     setActiveFeature("loading");
 
     // get model config
-    const backend = backendRef.current?.value || "webgpu";
-    const selectedModel = modelRef.current?.value || "yolo11n";
+    const backend = backendSelectorRef.current?.value || "webgpu";
+    const selectedModel = modelSelectorRef.current?.value || "yolo11n";
 
     const customModel = customModels.find(
       (model) => model.url === selectedModel
@@ -461,9 +467,10 @@ function App() {
       const src_mat = cv.imread(imgRef.current);
       const [results, results_inferenceTime] = await inference_pipeline(
         src_mat,
-        [overlayRef.current.width, overlayRef.current.height],
         sessionRef.current,
-        new BYTETracker()
+        new BYTETracker(),
+        [(overlayRef.current.width, overlayRef.current.height)],
+        imgszTypeSelectorRef.current.value
       );
       const overlayCtx = overlayRef.current.getContext("2d");
       overlayCtx.clearRect(
@@ -522,6 +529,7 @@ function App() {
     let ctx = inputCanvas.getContext("2d", {
       willReadFrequently: true,
     });
+    const tracker = new BYTETracker();
 
     const handle_frame_continuous = async () => {
       if (!cameraRef.current?.srcObject) {
@@ -539,9 +547,10 @@ function App() {
       const src_mat = cv.imread(inputCanvas);
       const [results, results_inferenceTime] = await inference_pipeline(
         src_mat,
-        [overlayRef.current.width, overlayRef.current.height],
         sessionRef.current,
-        new BYTETracker()
+        tracker,
+        [overlayRef.current.width, overlayRef.current.height],
+        imgszTypeSelectorRef.current.value
       );
       const overlayCtx = overlayRef.current.getContext("2d");
       overlayCtx.clearRect(
@@ -569,6 +578,7 @@ function App() {
         {
           file: file,
           modelConfig: modelConfigRef.current,
+          imgsz_type: imgszTypeSelectorRef.current.value,
         },
         []
       );
@@ -585,9 +595,10 @@ function App() {
       </h1>
 
       <SettingsPanel
-        backendRef={backendRef}
-        modelRef={modelRef}
+        backendSelectorRef={backendSelectorRef}
+        modelSelectorRef={modelSelectorRef}
         cameraSelectorRef={cameraSelectorRef}
+        imgszTypeSelectorRef={imgszTypeSelectorRef}
         cameras={cameras}
         customModels={customModels}
         onModelChange={loadModel}

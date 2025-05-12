@@ -7,12 +7,13 @@ import { draw_bounding_boxes } from "./draw_bounding_boxes";
 import { BYTETracker } from "./tracker";
 
 self.onmessage = async function (e) {
-  const { file, modelConfig } = e.data;
+  const { file, modelConfig, imgsz_type } = e.data;
 
   // Model
   const yolo_model = await ort.InferenceSession.create(modelConfig.model_path, {
     executionProviders: [modelConfig.backend],
   });
+  const tracker = new BYTETracker();
 
   // State variables
   let inputCanvas, inputCtx, resultCanvas, resultCtx;
@@ -126,9 +127,10 @@ self.onmessage = async function (e) {
       // Inference, Draw
       const [results, inferenceTime] = await inference_pipeline(
         src_mat,
-        [inputCanvas.width, inputCanvas.height],
         yolo_model,
-        new BYTETracker()
+        tracker,
+        [inputCanvas.width, inputCanvas.height],
+        imgsz_type
       );
       await draw_bounding_boxes(results, resultCtx);
 

@@ -2,11 +2,11 @@ import * as math from "mathjs";
 import { minWeightAssign } from "munkres-algorithm";
 
 const BYTE_TRACKER_CONFIG = {
-  track_high_thresh: 0.25, // threshold for the first association (0.25 are default)
+  track_high_thresh: 0.25, // threshold for the first association (default 0.25)
   track_low_thresh: 0.1, // threshold for the second association
   new_track_thresh: 0.25, // threshold for init new track if the detection does not match any tracks
-  track_buffer: 30, // buffer to calculate the time when to remove tracks
-  match_thresh: 0.8, // threshold for matching tracks
+  track_buffer: 60, // buffer to calculate the time when to remove tracks (default 30)
+  match_thresh: 0.8, // threshold for matching tracks (default 0.8)
   fuse_score: true, // Whether to fuse scoreidence scores with the iou distances before matching
 };
 
@@ -303,10 +303,11 @@ export class BYTETracker {
     const tracks_tlwh = tracks.map((t) => t.xywhToTlwh(t.xywh));
     const dets_tlwh = detections.map((d) => d.xywhToTlwh(d.xywh));
     const dists = new Array(tracks.length);
-    const DIST_THRESH = Math.max(...tracks_tlwh.map((t) => t[2] + t[3])) * 2;
+    // const DIST_THRESH = Math.max(...tracks_tlwh.map((t) => t[2] + t[3])) * 2;
     for (let i = 0; i < tracks.length; i++) {
       const row = new Array(detections.length);
       const [tx, ty] = tracks_tlwh[i];
+      const DIST_THRESH = (tracks_tlwh[i][2] + tracks_tlwh[i][3]) * 1.5;
       for (let j = 0; j < detections.length; j++) {
         const [dx, dy] = dets_tlwh[j];
         if (Math.abs(tx - dx) + Math.abs(ty - dy) > DIST_THRESH) {

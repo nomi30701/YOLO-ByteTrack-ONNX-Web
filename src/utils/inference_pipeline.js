@@ -1,39 +1,29 @@
 import * as ort from "onnxruntime-web/webgpu";
-import { preProcess_dynamic, preProcess, applyNMS } from "./img_preprocess";
+import { preProcess_img, applyNMS } from "./img_preprocess";
 
 /**
  * Inference pipeline for YOLO model.
  * @param {cv.Mat} src_mat - Input image Mat.
- * @param {[Number, Number]} overlay_size - Overlay width and height. [width, height]
  * @param {ort.InferenceSession} session - YOLO model session.
  * @param {BYTETracke} tracker - Object tracker instance.
+ * @param {[Number, Number]} overlay_size - Overlay width and height. [width, height]
+ * @param {String} imgsz_type - Image size type, either "dynamic" or "zeroPad".
  * @returns {[Array[Object], Number]} - Array of predictions and inference time.
  */
 export async function inference_pipeline(
   src_mat,
-  overlay_size,
   session,
-  tracker
+  tracker,
+  overlay_size,
+  imgsz_type
 ) {
   try {
-    // const [src_mat_preProcessed, xRatio, yRatio] = await preProcess(
-    //   src_mat,
-    //   640,
-    //   640
-    // );
-
-    const [src_mat_preProcessed, div_width, div_height] =
-      preProcess_dynamic(src_mat);
-    const xRatio = overlay_size[0] / div_width; // scale factor for overlay
-    const yRatio = overlay_size[1] / div_height;
-    src_mat.delete();
-
-    const input_tensor = new ort.Tensor(
-      "float32",
-      src_mat_preProcessed.data32F,
-      [1, 3, div_height, div_width]
+    const [input_tensor, xRatio, yRatio] = preProcess_img(
+      src_mat,
+      overlay_size,
+      imgsz_type
     );
-    src_mat_preProcessed.delete();
+    src_mat.delete();
 
     const start = performance.now();
     const { output0 } = await session.run({
@@ -67,14 +57,14 @@ export async function inference_pipeline(
           cls_idx = c;
         }
       }
-      // Filter low confidence for ByteTrack
-      if (maxScore <= 0.2) continue;
+      // Filter low confidence for ByteTrack.
+      if (maxScore <= 0.35) continue;
 
       // x_center, y_center, width, height
-      const xc = bbox_data[i] * xRatio;
-      const yc = bbox_data[i + NUM_PREDICTIONS] * yRatio;
       const w = bbox_data[i + NUM_PREDICTIONS * 2] * xRatio;
       const h = bbox_data[i + NUM_PREDICTIONS * 3] * yRatio;
+      const xc = bbox_data[i] * xRatio;
+      const yc = bbox_data[i + NUM_PREDICTIONS] * yRatio;
 
       detections[resultCount++] = {
         xywh: [xc, yc, w, h],
