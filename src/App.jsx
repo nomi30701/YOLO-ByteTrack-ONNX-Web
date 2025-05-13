@@ -8,8 +8,6 @@ import { BYTETracker } from "./utils/tracker";
 import classes from "./utils/yolo_classes.json";
 
 // TODO: add set class.json
-// TODO: button components too much code
-// TODO: README.md add package import
 
 // set Components
 function SettingsPanel({
@@ -469,7 +467,7 @@ function App() {
         src_mat,
         sessionRef.current,
         new BYTETracker(),
-        [(overlayRef.current.width, overlayRef.current.height)],
+        [overlayRef.current.width, overlayRef.current.height],
         imgszTypeSelectorRef.current.value
       );
       const overlayCtx = overlayRef.current.getContext("2d");

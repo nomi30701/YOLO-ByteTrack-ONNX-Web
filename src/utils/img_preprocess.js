@@ -10,23 +10,25 @@ import * as ort from "onnxruntime-web/webgpu";
  * @returns {[ort.Tensor, Number, Number]} - return
  */
 const preProcess_img = (src_mat, size, imgsz_type) => {
-  let preProcessed, xRatio, yRatio, input_tensor;
+  let preProcessed, xRatio, yRatio, input_tensor, div_width, div_height;
 
   if (imgsz_type === "dynamic") {
-    [preProcessed, xRatio, yRatio] = img_dynamic(src_mat, size);
-    const [div_width, div_height] = divStride(32, src_mat.cols, src_mat.rows);
+    [preProcessed, xRatio, yRatio, div_width, div_height] = img_dynamic(
+      src_mat,
+      size
+    );
     input_tensor = new ort.Tensor(
       "float32",
       preProcessed.data32F,
       [1, 3, div_height, div_width] // [batch, channel, height, width]
     );
   } else if (imgsz_type === "zeroPad") {
-    const modelSize = [640, 640]; // yolo model default input size
-    [preProcessed, xRatio, yRatio] = img_zeroPad(src_mat, modelSize);
+    const model_size = [640, 640]; // yolo model default input size
+    [preProcessed, xRatio, yRatio] = img_zeroPad(src_mat, model_size, size);
     input_tensor = new ort.Tensor(
       "float32",
       preProcessed.data32F,
-      [1, 3, modelSize[1], modelSize[0]] // [batch, channel, height, width]
+      [1, 3, model_size[1], model_size[0]] // [batch, channel, height, width]
     );
   }
   preProcessed.delete();
@@ -40,10 +42,14 @@ const preProcess_img = (src_mat, size, imgsz_type) => {
  * Zero padding to square and resize to input size.
  *
  * @param {cv.Mat} mat - Pre process yolo model input image.
- * @param {Number} size - Yolo model image size input [width, height].
- * @returns {cv.Mat} Processed input mat.
+ * @param {Number} model_size - Yolo model image size input [width, height].
+ * @param {Number} output_size - Overlay image size [width, height].
+ * @returns {[cv.Mat, Number, Number]} Processed input mat, xRatio, yRatio.
  */
-const img_zeroPad = (mat, size) => {
+const img_zeroPad = (mat, model_size, output_size) => {
+  const original_width = mat.cols;
+  const original_height = mat.rows;
+
   cv.cvtColor(mat, mat, cv.COLOR_RGBA2RGB);
 
   // Resize to dimensions divisible by 32
@@ -69,15 +75,14 @@ const img_zeroPad = (mat, size) => {
   const preProcessed = cv.blobFromImage(
     mat,
     1 / 255.0,
-    { width: size[0], height: size[1] },
+    { width: model_size[0], height: model_size[1] },
     [0, 0, 0, 0],
     false,
     false
   );
 
-  // Calculate ratios
-  const xRatio = mat.cols / size[0];
-  const yRatio = mat.rows / size[1];
+  const xRatio = (output_size[0] / div_width) * (max_dim / model_size[0]);
+  const yRatio = (output_size[1] / div_height) * (max_dim / model_size[1]);
 
   return [preProcessed, xRatio, yRatio];
 };
@@ -86,7 +91,7 @@ const img_zeroPad = (mat, size) => {
  * Pre process input image for dynamic input model.
  *
  * @param {cv.Mat} mat - Pre process yolo model input image.
- * @returns {cv.Mat} Processed input mat.
+ * @returns {[cv.mat, Number, Number ...]} Processed input mat, xRatio, yRatio, div_width, div_height.
  */
 const img_dynamic = (mat, size) => {
   cv.cvtColor(mat, mat, cv.COLOR_RGBA2RGB);
@@ -105,7 +110,7 @@ const img_dynamic = (mat, size) => {
   );
   const xRatio = size[0] / div_width; // scale factor for overlay
   const yRatio = size[1] / div_height;
-  return [preProcessed, xRatio, yRatio];
+  return [preProcessed, xRatio, yRatio, div_width, div_height];
 };
 
 /**
