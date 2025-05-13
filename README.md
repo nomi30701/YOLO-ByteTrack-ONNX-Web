@@ -103,7 +103,6 @@ In App.jsx
 
 Replace `"your-custom-model-name"` with the filename of your ONNX model.
 
-
 ### Step 3: Update class definitions
 
 Update the `src/utils/yolo_classes.json` file with the class names that your custom model uses. This file should contain a dict of strings representing the class labels.
@@ -125,35 +124,24 @@ Make sure the classes match exactly with those used during training of your cust
 
 ### Step 4: Refresh and select your new model 🎉
 
-## 💡 Advanced Configuration Tips
-> 📏 **Dynamic Input Size**
-> Dynamic input size support is enabled by default. For fixed size, modify `/utils/inference_pipeline.js`:
-> 1. Uncomment this code:
-> ```Javascript
-> const [src_mat_preProcessed, xRatio, yRatio] = await preProcess(
->   src_mat,
->   640,
->   640
-> );
-> ```
-> 
-> 2. Remove the dynamic sizing code:
-> ```Javascript
-> const [src_mat_preProcessed, div_width, div_height] = preProcess_dynamic(src_mat);
-> const xRatio = overlay_el.width / div_width;
-> const yRatio = overlay_el.height / div_height;
-> ```
->
-> 3. Change Tensor size
-> ```Javascript
-> const input_tensor = new ort.Tensor("float32", src_mat_preProcessed.data32F, [
->   1,
->   3,
->   640,
->   640,
-> ]);
->
-
 > 🚀 WebGPU Support
 >
 > Ensure you set `opset=12` when exporting ONNX models, as this is required for WebGPU compatibility.
+
+## 📸 Image Processing Options
+
+The web application provides two options for handling input image sizes, controlled by the `imgsz_type` setting:
+
+- **Dynamic:**
+  - When selected, the input image is used at its original size without resizing.
+  - Inference time may vary depending on the image resolution; larger images take longer to process.
+
+- **Zero Pad:**
+  - When selected, the input image is first padded with zero pixels to make it square (by adding padding to the right and bottom).
+  - The padded image is then resized to 640x640 pixels.
+  - This option provides a balance between accuracy and inference time, as it avoids extreme scaling while maintaining a predictable processing speed.
+  - Use this option for real-time applications.
+
+> ✨ Dynamic input
+>
+> This requires that the YOLO model was exported with `dynamic=True` to support variable input sizes.
