@@ -6,6 +6,8 @@
 <img src="https://github.com/nomi30701/YOLO-ByteTrack-ONNX-Web/blob/main/preview.gif" width="80%" alt="YOLO Multi-Task Demo">
 </div>
 
+[Preview Video](https://www.youtube.com/watch?v=rpo2T0A7Yfo)
+
 ## ✨ Features
 
 This web application leverages ONNX Runtime Web and YOLO models for multi-object detection and tracking.
